@@ -4,6 +4,7 @@ queryTable <- readr::read_csv("http://lipdverse.org/lipdverse/lipdverseQuery.csv
 
 points = data.frame(lon=queryTable$geo_longitude, lat=queryTable$geo_latitude)
 
+library(lipdR)
 library(sp)
 library(rworldmap)
 
@@ -67,6 +68,8 @@ for (i in fuzzyVars){
   queryTable <- cbind(queryTable, d18O)
 }
 
+dim(queryTable)
+
 queryTable$varTags <- apply(queryTable[,465:467], 1, function(x) paste(x[!is.na(x)], collapse = " "))
 queryTable$varTags[queryTable$varTags == ""] <- NA
 
@@ -85,14 +88,25 @@ compressedTable <- queryTable[,colnames(queryTable) %in% keeps]
 compressedTable <- apply(compressedTable,2,as.character)
 
 zipped.csv <- function(df, zippedfile) {
-  # init temp csv
-  temp <- tempfile(fileext=".csv")
+  # Create a query table dir
+  dir_tmp <- create_tmp_dir()
+  dir_zip <- file.path(dir_tmp, "zip")
+  dir.create(dir_zip, showWarnings=FALSE)
   # write temp csv
-  write.csv(df, file=temp)
+  filenameCSV <- paste0(dir_zip, "/queryTable.csv")
+  write.csv(df, file=filenameCSV)
+  #write MD5 payload manifest
+  manifest1 <- tools::md5sum(filenameCSV)
+  write.table(x = manifest1,
+              file = file.path(dir_zip, "manifest-md5.txt"),
+              row.names = F,
+              col.names = F,
+              quote = F,
+              sep = '\t')
   # zip temp csv
-  zip(zippedfile,temp, extras = '-j')
+  zip(zippedfile,dir_zip, extras = '-j')
   # delete temp csv
-  unlink(temp)
+  unlink(dir_tmp)
 }
 
 zipped.csv(df=compressedTable, zippedfile = "queryZip")
